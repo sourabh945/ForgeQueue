@@ -9,3 +9,6 @@ shared/output/*
 
 # OS files
 .DS_Store
+
+#AI files
+.ropeproject/*
