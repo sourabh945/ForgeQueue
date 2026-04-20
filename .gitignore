@@ -1,0 +1,11 @@
+# Sockets
+*.sock
+
+# shared data
+shared/input/*
+shared/output/*
+!shared/input/.gitkeep
+!shared/output/.gitkeep
+
+# OS files
+.DS_Store
