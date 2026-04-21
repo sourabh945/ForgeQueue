@@ -11,4 +11,7 @@ shared/output/*
 .DS_Store
 
 #AI files
-.ropeproject/*
+**/.ropeproject
+
+#Pycache files
+**/__pycache__/
