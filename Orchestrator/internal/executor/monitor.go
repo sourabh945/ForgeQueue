@@ -5,7 +5,7 @@ import (
 	"log/slog"
 )
 
-func catchErr(err error, logger *slog.Logger) {
+func _catchErr(err error, logger *slog.Logger) {
 	if err == bufio.ErrTooLong {
 		logger.Error("line too long, increase buffer size")
 	} else {
@@ -14,19 +14,26 @@ func catchErr(err error, logger *slog.Logger) {
 
 }
 
+// StdOutLogger logs the stdout stream of the process
 func (proc *Process) StdOutLogger() {
-	stdoutLogger := proc.Logger.With("logger", "stdout")
+	stdoutLogger := proc.Logger.With(slog.String("type", "stream"), slog.String("stream", "stdout"))
+	moduleLogger := proc.Logger.With(slog.String("type", "module"), slog.String("module", "monitor.StdOutLogger"))
 	scanner := bufio.NewScanner(proc.StdOut)
 	for scanner.Scan() {
 		stdoutLogger.Info("stdout: " + scanner.Text())
 	}
-	if err := scanner.Err(); err != nil {
-		proc.Logger.Error("stdout scanner error: " + err.Error())
-	}
+	err := scanner.Err()
+	_catchErr(err, moduleLogger)
 }
+
+// StdErrLogger logs the stderr stream of the process
 func (proc *Process) StdErrLogger() {
+	stderrLogger := proc.Logger.With(slog.String("type", "stream"), slog.String("stream", "stderr"))
+	moduleLogger := proc.Logger.With(slog.String("type", "module"), slog.String("module", "monitor.StdErrLogger"))
 	scanner := bufio.NewScanner(proc.StdErr)
 	for scanner.Scan() {
-		proc.Logger.Info("stderr: " + scanner.Text())
+		stderrLogger.Error("stderr: " + scanner.Text())
 	}
+	err := scanner.Err()
+	_catchErr(err, moduleLogger)
 }

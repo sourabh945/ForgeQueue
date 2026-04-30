@@ -17,13 +17,13 @@ type Process struct {
 // if the status code is not -ve so the process is killed by orchestrator due some reason not due to some error.
 // Like to many process is running and it have nothing have to process
 func (proc *Process) KillProcess(exitCode int) {
-
+	logger := proc.Logger.With(slog.String("type", "module"), slog.String("module", "process.KillProcess"))
 	proc.ExitCode = exitCode
 	err := proc.Cmd.Process.Kill()
 	if err != nil {
-		proc.Logger.Error("failed to kill process", slog.Any("error", err))
+		logger.Error("failed to kill process", slog.Any("error", err))
 	}
-	proc.Logger.Info("process killed successfully", slog.Int("statusCode", exitCode))
+	logger.Info("process killed successfully", slog.Int("statusCode", exitCode))
 
 }
 
@@ -32,6 +32,7 @@ func (proc *Process) KillProcess(exitCode int) {
 func (proc *Process) WaitForProcess(cancelFxn context.CancelFunc) {
 	defer cancelFxn()
 
+	logger := proc.Logger.With(slog.String("type", "module"), slog.String("module", "process.WaitForProcess"))
 	err := proc.Cmd.Wait()
 	if proc.ExitCode == 256 {
 		if err != nil {
@@ -42,7 +43,7 @@ func (proc *Process) WaitForProcess(cancelFxn context.CancelFunc) {
 				proc.ExitCode = -5
 			}
 		}
-		proc.Logger.Error("process exited", slog.Any("exitCode", proc.ExitCode))
+		logger.Error("process exited", slog.Any("exitCode", proc.ExitCode))
 	}
 
 }
