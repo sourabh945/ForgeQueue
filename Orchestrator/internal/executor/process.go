@@ -34,7 +34,7 @@ func (proc *Process) WaitForProcess(cancelFxn context.CancelFunc) {
 
 	logger := proc.Logger.With(slog.String("type", "module"), slog.String("module", "process.WaitForProcess"))
 	err := proc.Cmd.Wait()
-	if proc.ExitCode == 256 {
+	if proc.ExitCode == 256 || proc.ExitCode > 0 {
 		if err != nil {
 			var exitErr *exec.ExitError
 			if errors.As(err, &exitErr) {

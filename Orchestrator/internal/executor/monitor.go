@@ -22,8 +22,9 @@ func (proc *Process) StdOutLogger() {
 	for scanner.Scan() {
 		stdoutLogger.Info("stdout: " + scanner.Text())
 	}
-	err := scanner.Err()
-	_catchErr(err, moduleLogger)
+	if err := scanner.Err(); err != nil {
+		_catchErr(err, moduleLogger)
+	}
 }
 
 // StdErrLogger logs the stderr stream of the process
@@ -34,6 +35,7 @@ func (proc *Process) StdErrLogger() {
 	for scanner.Scan() {
 		stderrLogger.Error("stderr: " + scanner.Text())
 	}
-	err := scanner.Err()
-	_catchErr(err, moduleLogger)
+	if err := scanner.Err(); err != nil {
+		_catchErr(err, moduleLogger)
+	}
 }
