@@ -9,9 +9,9 @@ import (
 	typesipc "github.com/sourabh945/ForgeQueue/Orchestrator/internal/types"
 )
 
-// connectSendJob connects to a unix socket, sends the job, and returns the connection.
+// initConnection initializes a connection to the unix socket and returns it.
 // NOTE: The caller is responsible for calling conn.Close() when done.
-func connectSendJob(socketPath string, job typesipc.Job, logger *slog.Logger) net.Conn {
+func initConnection(socketPath string, logger *slog.Logger) net.Conn {
 
 	// connecting to the unix socket
 	conn, err := net.Dial("unix", socketPath)
@@ -19,6 +19,12 @@ func connectSendJob(socketPath string, job typesipc.Job, logger *slog.Logger) ne
 		logger.Error("Failed to connect to socket", slog.String("error", err.Error()))
 		return nil
 	}
+
+	return conn
+}
+
+// initJob sends the job over the connection and returns the connection.
+func initJob(conn net.Conn, job typesipc.Job, logger *slog.Logger) net.Conn {
 
 	// making data into json format to send
 	jsonData, err := json.Marshal(job)
