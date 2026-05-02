@@ -15,7 +15,7 @@ func _catchErr(err error, logger *slog.Logger) {
 }
 
 // StdOutLogger logs the stdout stream of the process
-func (proc *Process) StdOutLogger() {
+func (proc *Worker) StdOutLogger() {
 	stdoutLogger := proc.Logger.With(slog.String("type", "stream"), slog.String("stream", "stdout"))
 	moduleLogger := proc.Logger.With(slog.String("type", "module"), slog.String("module", "monitor.StdOutLogger"))
 	scanner := bufio.NewScanner(proc.StdOut)
@@ -28,7 +28,7 @@ func (proc *Process) StdOutLogger() {
 }
 
 // StdErrLogger logs the stderr stream of the process
-func (proc *Process) StdErrLogger() {
+func (proc *Worker) StdErrLogger() {
 	stderrLogger := proc.Logger.With(slog.String("type", "stream"), slog.String("stream", "stderr"))
 	moduleLogger := proc.Logger.With(slog.String("type", "module"), slog.String("module", "monitor.StdErrLogger"))
 	scanner := bufio.NewScanner(proc.StdErr)

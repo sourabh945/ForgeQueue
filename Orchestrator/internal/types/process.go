@@ -7,8 +7,9 @@ import (
 	"os/exec"
 )
 
-type Process struct {
-	Status     int           // It is status of the process 0 for not working, 1 for running, -1 for closed/ error happens
+type Worker struct {
+	ID         string        // It is unique identifier for the process
+	Status     string        // It is status of the worker is : running, free, frezzed, stopped, fail
 	SocketPath string        // It is path to the unix socket
 	Cmd        *exec.Cmd     // It is process executor pointer
 	Conn       net.Conn      // It is connection to the unix socket
@@ -19,6 +20,6 @@ type Process struct {
 	ExitCode   int           // It is exit code of the process 0 for success, 1-255 for failure or -ve for intensional kill and 256 for no value
 }
 
-type ProcessConfig struct {
+type WorkerProcessConfig struct {
 	MaxTime int // It is maximum time in seconds for the process to execute after which it will be terminated
 }
