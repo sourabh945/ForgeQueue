@@ -41,6 +41,8 @@ func (proc *Worker) WaitForProcess() {
 			} else {
 				proc.ExitCode = -5
 			}
+		} else {
+			proc.ExitCode = proc.Cmd.ProcessState.ExitCode()
 		}
 		logger.Error("process exited", slog.Any("exitCode", proc.ExitCode))
 	}
