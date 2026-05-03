@@ -33,7 +33,7 @@ func (proc *Worker) WaitForProcess() {
 
 	logger := proc.Logger.With(slog.String("type", "module"), slog.String("module", "worker.WaitForProcess"))
 	err := proc.Cmd.Wait()
-	if proc.ExitCode == 256 || proc.ExitCode > 0 {
+	if proc.ExitCode == 256 {
 		if err != nil {
 			var exitErr *exec.ExitError
 			if errors.As(err, &exitErr) {

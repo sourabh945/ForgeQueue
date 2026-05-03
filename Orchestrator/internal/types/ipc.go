@@ -11,3 +11,7 @@ type JobResponse struct {
 	ImagePath string `json:"ImagePath"`
 	Status    string `json:"Status"`
 }
+
+type UnFrezzingResponse struct {
+	Status string `json:"Status"`
+}

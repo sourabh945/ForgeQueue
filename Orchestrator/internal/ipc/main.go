@@ -80,3 +80,25 @@ func (worker *Worker) waitForJobResponse() types.JobResponse {
 
 	return response
 }
+
+// waitForUnFrezzing waits for the socket to be unfrezzing before returning.
+func (worker *Worker) waitForUnFrezzing() bool {
+	conn := worker.Conn
+	logger := worker.Logger.With(slog.String("type", "ipc"), slog.String("module", "worker.waitForUnFrezzing"))
+
+	logger.Info("Waiting for the socket to be unfrezzing, and getting ready for job")
+
+	// reading from socket
+	decoder := json.NewDecoder(conn)
+	var response types.UnFrezzingResponse
+	if err := decoder.Decode(&response); err != nil {
+		logger.Error("Failed to decode response", slog.String("error", err.Error()))
+		return false
+	}
+
+	logger.Info("Job response received", slog.String("UnfrezzingResponseStatus", response.Status))
+	if response.Status == "true" {
+		return true
+	}
+	return false
+}
