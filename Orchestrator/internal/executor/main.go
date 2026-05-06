@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"syscall"
 
+	ipc "github.com/sourabh945/ForgeQueue/Orchestrator/internal/ipc"
 	Types "github.com/sourabh945/ForgeQueue/Orchestrator/internal/types"
 )
 
@@ -29,35 +30,62 @@ func InitWorkerProcess(cmd []string, _logger *slog.Logger, workerCount int) Work
 	_cmd := append(cmd, socketPath)
 
 	// executing the command
-	commnad := exec.Command(_cmd[0], _cmd[1:]...)
+	command := exec.Command(_cmd[0], _cmd[1:]...)
 
 	// setting the process group ID to the worker's PID
-	commnad.SysProcAttr = &syscall.SysProcAttr{
+	command.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
 
 	// getting the stdout and stderr pipes
-	stdoutPipe, err := commnad.StdoutPipe()
+	stdoutPipe, err := command.StdoutPipe()
 	if err != nil {
 		moduleLogger.Error("failed to create stdout pipe", "error", err)
 		return Worker{}
 	}
 
-	stderrPipe, err := commnad.StderrPipe()
+	stderrPipe, err := command.StderrPipe()
 	if err != nil {
 		moduleLogger.Error("failed to create stderr pipe", "error", err)
 		return Worker{}
 	}
 
-	return Worker{
+	//start the process
+	if err := command.Start(); err != nil {
+		moduleLogger.Error("failed to start process", "error", err)
+		return Worker{}
+	}
+
+	// create the worker struct
+	worker := Worker{
 		Worker: &Types.Worker{
 			ID:         id,
 			Status:     "free",
 			SocketPath: socketPath,
-			Cmd:        commnad,
+			Cmd:        command,
 			Logger:     logger,
 			StdOut:     stdoutPipe,
 			StdErr:     stderrPipe,
+			ExitCode:   256,
 		},
 	}
+
+	// fire the goroutine to read from the stdout and stderr pipes
+	go worker.StdOutLogger()
+	go worker.StdErrLogger()
+
+	// fire the goroutine to wait for the process to exit
+	go worker.WaitForProcess()
+
+	// fire the ipc connection
+	conn := ipc.InitConnection(socketPath, logger)
+	if conn == nil {
+		worker.KillProcess(-2)
+		moduleLogger.Error("failed to connect to socket", slog.Any("error", err))
+		return Worker{}
+	}
+
+	worker.Conn = conn
+
+	return worker
 }

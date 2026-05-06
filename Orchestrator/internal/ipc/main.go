@@ -13,9 +13,9 @@ type Worker struct {
 	*types.Worker
 }
 
-// initConnection initializes a connection to the unix socket and returns it.
+// InitConnection initializes a connection to the unix socket and returns it.
 // NOTE: The caller is responsible for calling conn.Close() when done.
-func initConnection(socketPath string, _logger *slog.Logger) net.Conn {
+func InitConnection(socketPath string, _logger *slog.Logger) net.Conn {
 
 	logger := _logger.With(slog.String("type", "ipc"), slog.String("module", "ipc.initConnection"))
 
@@ -31,8 +31,8 @@ func initConnection(socketPath string, _logger *slog.Logger) net.Conn {
 	return conn
 }
 
-// initJob sends the job over the connection
-func (worker *Worker) initJob(job types.Job) {
+// InitJob sends the job over the connection
+func (worker *Worker) InitJob(job types.Job) {
 
 	logger := worker.Logger.With(slog.String("type", "ipc"), slog.String("module", "ipc.initJob"), slog.String("jobId", job.JobId))
 	conn := worker.Conn
@@ -61,8 +61,8 @@ func (worker *Worker) initJob(job types.Job) {
 
 }
 
-// waitForJobResponse waits for a job response from the socket and returns it.
-func (worker *Worker) waitForJobResponse() types.JobResponse {
+// WaitForJobResponse waits for a job response from the socket and returns it.
+func (worker *Worker) WaitForJobResponse() types.JobResponse {
 	conn := worker.Conn
 	logger := worker.Logger.With(slog.String("type", "ipc"), slog.String("module", "ipc.waitForJobResponse"), slog.String("jobId", worker.Job.JobId))
 
@@ -81,8 +81,8 @@ func (worker *Worker) waitForJobResponse() types.JobResponse {
 	return response
 }
 
-// waitForUnFrezzing waits for the socket to be unfrezzing before returning.
-func (worker *Worker) waitForUnFrezzing() bool {
+// WaitForUnFrezzing waits for the socket to be unfrezzing before returning.
+func (worker *Worker) WaitForUnFrezzing() bool {
 	conn := worker.Conn
 	logger := worker.Logger.With(slog.String("type", "ipc"), slog.String("module", "worker.waitForUnFrezzing"))
 
