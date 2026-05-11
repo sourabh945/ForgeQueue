@@ -46,8 +46,8 @@ func InitConnection(socketPath string, _logger *slog.Logger) (net.Conn, error) {
 func (worker *Worker) InitJob(job types.Job) bool {
 
 	//read lock to ensure thread safety
-	mu := worker.mu.RLock()
-	defer mu.RUnLock() // unlock the read lock
+	worker.mu.RLock()
+	defer worker.mu.RUnLock() // unlock the read lock
 	logger := worker.Logger.With(slog.String("type", "ipc"), slog.String("module", "ipc.initJob"), slog.String("jobId", job.JobId))
 	conn := worker.Conn
 
@@ -80,8 +80,8 @@ func (worker *Worker) InitJob(job types.Job) bool {
 func (worker *Worker) WaitForJobResponse() (types.JobResponse, error) {
 
 	// adding Read lock on the workef
-	mu := worker.mu.RLock()
-	defer mu.RUnlock()
+	worker.mu.RLock()
+	defer worker.mu.RUnlock()
 
 	conn := worker.Conn
 	logger := worker.Logger.With(slog.String("type", "ipc"), slog.String("module", "ipc.waitForJobResponse"), slog.String("jobId", worker.Job.JobId))
@@ -104,8 +104,8 @@ func (worker *Worker) WaitForJobResponse() (types.JobResponse, error) {
 // WaitForUnFrezzing waits for the socket to be unfrezzing before returning.
 func (worker *Worker) WaitForUnFrezzing() bool {
 	// adding Read lock on the worker
-	mu := worker.mu.RLock()
-	defer mu.RUnlock()
+	worker.mu.RLock()
+	defer worker.mu.RUnlock()
 
 	conn := worker.Conn
 	logger := worker.Logger.With(slog.String("type", "ipc"), slog.String("module", "worker.waitForUnFrezzing"))
