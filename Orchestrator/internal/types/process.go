@@ -9,7 +9,7 @@ import (
 )
 
 type Worker struct {
-	mu          sync.RWMutex  // Mutex for read/write operations on the worker, multiple readers and single writer
+	ConnMu      sync.RWMutex  // Mutex for read/write operations on the Conn, multiple readers and single writer
 	ID          string        // It is unique identifier for the process
 	Status      string        // It is status of the worker is : running, free, frezzed, stopped, fail
 	SocketPath  string        // It is path to the unix socket

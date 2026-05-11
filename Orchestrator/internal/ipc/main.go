@@ -2,6 +2,7 @@ package ipc
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net"
 	"time"
@@ -10,81 +11,76 @@ import (
 	types "github.com/sourabh945/ForgeQueue/Orchestrator/internal/types"
 )
 
-type Worker struct {
-	*types.Worker
-}
-
-// InitConnection initializes a connection to the unix socket and returns it.
+// InitConnection dials the unix socket at socketPath, retrying up to 10 times
+// with 100ms between attempts (giving the worker process time to bind).
+// Returns a net.Conn on success, or an error if all attempts fail.
 // NOTE: The caller is responsible for calling conn.Close() when done.
 func InitConnection(socketPath string, _logger *slog.Logger) (net.Conn, error) {
 
-	logger := _logger.With(slog.String("type", "module"), slog.String("module", "ipc.initConnection"))
+	logger := _logger.With(slog.String("type", "module"), slog.String("module", "ipc.initConnection"), slog.String("socketPath", socketPath))
 
-	logger.Info("Connecting to socket", slog.String("socketPath", socketPath))
+	logger.Info("Connecting to socket")
 
-	var conn net.Conn
-	var err error
-
+	var (
+		conn net.Conn
+		err  error
+	)
 	// connecting to the unix socket
-	for range 10 {
+	for i := range 10 {
 		conn, err = net.Dial("unix", socketPath)
 		if err == nil {
-			logger.Info("Connected to socket", slog.String("socketPath", socketPath))
+			logger.Info("Connected to socket")
 			return conn, nil
 		}
-
+		logger.Debug("socket not ready, retrying", slog.Int("attempt", i+1), slog.Any("error", err))
 		// sleep for 10 seconds
-		time.Sleep(100 * time.Microsecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	logger.Error("Failed to connect to socket", slog.String("error", err.Error()))
-
-	return nil, err
+	return nil, fmt.Errorf("ipc.InitConnection: failed after 10 attempts with 100 ms gaps on `%q` socket: %w", socketPath, err)
 }
 
-// InitJob sends the job over the connection
-func (worker *Worker) InitJob(job types.Job) bool {
+// InitJob serialises job to JSON and writes it to the worker's connection.
+// It holds a write lock for the duration since it writes to the shared conn.
+func InitJob(worker *types.Worker, job types.Job) error {
 
-	//read lock to ensure thread safety
-	worker.mu.RLock()
-	defer worker.mu.RUnLock() // unlock the read lock
+	//write lock to ensure thread safety
+	worker.ConnMu.Lock()
+	defer worker.ConnMu.Unlock() // unlock the write lock
+
 	logger := worker.Logger.With(slog.String("type", "ipc"), slog.String("module", "ipc.initJob"), slog.String("jobId", job.JobId))
-	conn := worker.Conn
 
 	logger.Info("Sending job...")
 
 	// making data into json format to send
 	jsonData, err := json.Marshal(job)
 	if err != nil {
-		logger.Error("Failed to marshal JSON", slog.String("error", err.Error()))
-		conn.Close() // Clean up the connection we just opened
-		logger.Error("Failed to send job", slog.String("error", err.Error()))
-		return false
+		return fmt.Errorf("ipc.InitJob: marshal: %w", err)
 	}
 
-	// writing to socket
-	_, err = conn.Write(jsonData)
-	if err != nil {
-		logger.Error("Failed to write to socket", slog.String("error", err.Error()))
-		conn.Close()
-		logger.Error("Failed to send job", slog.String("error", err.Error()))
-		return false
+	if _, err = worker.Conn.Write(jsonData); err != nil {
+		return fmt.Errorf("ipc.InitJob: write: %w", err)
 	}
 
 	logger.Info("Job sent successfully")
-	return true
+	return nil
 
 }
 
-// WaitForJobResponse waits for a job response from the socket and returns it.
-func (worker *Worker) WaitForJobResponse() (types.JobResponse, error) {
+// WaitForJobResponse blocks until the worker sends back a JobResponse.
+// It holds a read lock since it only reads from the connection.
+func WaitForJobResponse(worker *types.Worker) (types.JobResponse, error) {
 
-	// adding Read lock on the workef
-	worker.mu.RLock()
-	defer worker.mu.RUnlock()
+	// adding Write lock on the worker for conn write only
+	worker.ConnMu.RLock()
+	defer worker.ConnMu.RUnlock()
 
 	conn := worker.Conn
-	logger := worker.Logger.With(slog.String("type", "ipc"), slog.String("module", "ipc.waitForJobResponse"), slog.String("jobId", worker.Job.JobId))
+	logger := worker.Logger.With(
+		slog.String("type", "ipc"),
+		slog.String("module", "ipc.waitForJobResponse"),
+		slog.String("jobId", worker.Job.JobId),
+	)
 
 	logger.Info("Waiting for job response")
 
@@ -101,28 +97,26 @@ func (worker *Worker) WaitForJobResponse() (types.JobResponse, error) {
 	return response, nil
 }
 
-// WaitForUnFrezzing waits for the socket to be unfrezzing before returning.
-func (worker *Worker) WaitForUnFrezzing() bool {
-	// adding Read lock on the worker
-	worker.mu.RLock()
-	defer worker.mu.RUnlock()
+// WaitForUnfreezing blocks until the worker signals it is ready to accept a new job.
+// Returns an error if the decode fails or the worker reports it is not ready.
+func WaitForUnfreezing(worker *types.Worker) error {
+	worker.ConnMu.RLock()
+	defer worker.ConnMu.RUnlock()
 
-	conn := worker.Conn
 	logger := worker.Logger.With(slog.String("type", "ipc"), slog.String("module", "worker.waitForUnFrezzing"))
 
 	logger.Info("Waiting for the socket to be unfrezzing, and getting ready for job")
 
 	// reading from socket
-	decoder := json.NewDecoder(conn)
-	var response types.UnFrezzingResponse
-	if err := decoder.Decode(&response); err != nil {
-		logger.Error("Failed to decode response", slog.String("error", err.Error()))
-		return false
+	var response types.UnFreezingResponse
+	if err := json.NewDecoder(worker.Conn).Decode(&response); err != nil {
+		return fmt.Errorf("ipc.WaitForUnfreezing: decode: %w", err)
 	}
 
-	logger.Info("Job response received", slog.String("UnfrezzingResponseStatus", response.Status))
-	if response.Status == "true" {
-		return true
+	if !response.Ready {
+		return fmt.Errorf("ipc.WaitForUnfreezing: worker reported not ready")
 	}
-	return false
+
+	logger.Info("worker is ready")
+	return nil
 }

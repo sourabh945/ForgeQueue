@@ -12,6 +12,6 @@ type JobResponse struct {
 	Status    string `json:"Status"`
 }
 
-type UnFrezzingResponse struct {
-	Status string `json:"Status"`
+type UnFreezingResponse struct {
+	Ready bool `json:"Ready"`
 }
