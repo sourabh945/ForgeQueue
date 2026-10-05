@@ -71,8 +71,8 @@ while True:
             result = {
                 "taskId": taskId,
                 "status": "failed",
-                "result": None,
-                "error": f"unsupported task type: {task_type}",
+                "result": {"outputFile": None, "error": "Unsupported task type"},
+                "error": None,
             }
         else:
             try:
@@ -83,18 +83,25 @@ while True:
                     "result": output,
                     "error": None,
                 }
+            except FileNotFoundError:
+                result = {
+                    "taskId": taskId,
+                    "status": "fail",
+                    "result": {"outputFile": None, "error": "Internal Error"},
+                    "error": "file is not found",
+                }
             except Exception as e:
                 result = {
                     "taskId": taskId,
                     "status": "failed",
-                    "result": None,
+                    "result": {"outputFile": None, "error": "Internal Error"},
                     "error": str(e),
                 }
     except Exception as e:
         result = {
             "taskId": None,
             "status": "failed",
-            "result": None,
+            "result": {"outputFile": None, "error": "Internal Error"},
             "error": f"malformed task: {e}",
         }
         print("malformed task")
