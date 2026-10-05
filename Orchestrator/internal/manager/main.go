@@ -1,3 +1,0 @@
-package manager
-
-func main() {}
