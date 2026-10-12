@@ -1,6 +1,3 @@
-import json
-
-
 def read_frame(sock):
     """Read a frame from the socket."""
     length_bytes = _recv_exact(
@@ -21,7 +18,7 @@ def write_frame(sock, data: bytes):
 
 def write_helo(sock):
     "for telling the orchestrator, worker is ready"
-    message = b'HELO'
+    message = b"HELO"
     write_frame(sock, message)
 
 

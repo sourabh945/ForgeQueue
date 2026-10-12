@@ -4,10 +4,15 @@ import socket
 import sys
 import time
 
+from global_logger import Logger
+
+logger = Logger()
+
 from handlers import get_handler
 
 # Import the worker function from the worker module
 from ipc import read_frame, write_frame, write_helo
+from response_generator import generate_response as gr
 
 SOCKET_PATH = ""
 client = None
@@ -15,12 +20,19 @@ client = None
 try:
     SOCKET_PATH = sys.argv[1]
 except IndexError:
-    print("Usage: python main.py <socket_path>")
+    logger.error(
+        "Argument Error: <socket_path> is not given", "Main.Argument", True, True
+    )
     sys.exit(1)
 
 
 def graceful_shutdown(signum, frame):
-    print(f"\n Recieved singal {signum}, shutting down...")
+    logger.info(
+        f"Recieved singal {signum}, shutting down...",
+        "Main.Signal Handler",
+        True,
+        False,
+    )
     if client:
         client.close()
     sys.exit(0)
@@ -43,11 +55,17 @@ def connect_with_retry(path, attempts=10, delay=0.1):
 
 
 # unix domain sockets client for connection
-sock = connect_with_retry(SOCKET_PATH)
-print(f"Connected to orchestrator at {SOCKET_PATH}")
-
+sock = None
+try:
+    sock = connect_with_retry(SOCKET_PATH)
+    logger.info(f"Connected to orchestrator at {SOCKET_PATH}", "Main", True)
+except Exception as err:
+    logger.error(str(err), "Main.Connection_with_retry", True, True)
+    sys.exit(2)
 # send the initial HELO message for telling orch the system is ready
+
 write_helo(sock)
+logger.info("Send HELO to the orch", "Main.write_helo", True)
 
 # main loop - read task, processing , response, repeat
 while True:
@@ -55,61 +73,70 @@ while True:
     try:
         raw = read_frame(sock)
     except Exception as e:
-        print(f"read_frame failed: {e}")
+        logger.error(f"read_frame failed: {e}", "Main.MainWorkerLoop", True, True)
         break
 
     if raw == b"":
-        print("orchestrator close connection")
+        logger.error("orchestrator close connection", "Main.MainWorkerLoop", True, True)
         break
 
     try:
         task = json.loads(raw)
+
         task_type = task.get("type")
         handler = get_handler(task_type)
         taskId = task.get("taskId")
+
+        # setting the taskId into the logger for bette logging
+        logger.set_taskId(taskId)
+        logger.info("Revcived the task", "Main.MainWorkerLoop", True)
+
         if handler is None:
-            result = {
-                "taskId": taskId,
-                "status": "failed",
-                "result": {"outputFile": None, "error": "Unsupported task type"},
-                "error": None,
-            }
+            result = gr(
+                taskId,
+                "failed",
+                {"outputFile": None, "error": "Unsupported task type"},
+                None,
+            )
+            logger.error("Unsupported task type", "Main.MainWorkerLoop")
         else:
             try:
                 output, status = handler(task.get("payload", {}))
-                result = {
-                    "taskId": taskId,
-                    "status": status,
-                    "result": output,
-                    "error": None,
-                }
+                result = gr(
+                    taskId,
+                    status,
+                    output,
+                    None,
+                )
             except FileNotFoundError:
-                result = {
-                    "taskId": taskId,
-                    "status": "fail",
-                    "result": {"outputFile": None, "error": "Internal Error"},
-                    "error": "file is not found",
-                }
+                result = gr(
+                    taskId,
+                    "fail",
+                    {"outputFile": None, "error": "Internal Error"},
+                    "file is not found",
+                )
+                logger.error("FileNotFoundError", "Main.MainWorkerLoop", True, True)
             except Exception as e:
-                result = {
-                    "taskId": taskId,
-                    "status": "failed",
-                    "result": {"outputFile": None, "error": "Internal Error"},
-                    "error": str(e),
-                }
+                result = gr(
+                    taskId,
+                    "failed",
+                    {"outputFile": None, "error": str(e)},
+                    None,
+                )
+                logger.error(str(e), "Main.MainWorkerLoop")
     except Exception as e:
-        result = {
-            "taskId": None,
-            "status": "failed",
-            "result": {"outputFile": None, "error": "Internal Error"},
-            "error": f"malformed task: {e}",
-        }
-        print("malformed task")
-
+        result = gr(
+            None,
+            "failed",
+            {"outputFile": None, "error": "Internal Error"},
+            f"malformed task: {e}",
+        )
+        logger.error("Malformed task", "Main.MainWorkerLoop", True, True)
     try:
         write_frame(sock, json.dumps(result).encode("utf-8"))
+        logger.info("Task Completed Successfully", "Main.MainWorkerLoop")
     except Exception as e:
-        print(f"write_frame failed : {e} ")
+        logger.error(f"write_frame failed : {e} ", "Main.MainWorkerLoop", True)
         break
 
 sock.close()
