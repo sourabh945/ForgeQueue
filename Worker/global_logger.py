@@ -1,4 +1,3 @@
-import builtins
 import json
 import sys
 from datetime import datetime as dt
@@ -27,8 +26,10 @@ class Logger:
             sys.stdout.write(json.dumps(payload) + "\n")
             sys.stdout.flush()
 
-    def info(self, message: str, module: str, internal: bool=False):
+    def info(self, message: str, module: str, internal: bool = False):
         return self.log(message, module, internal, False, "info")
 
-    def error(self, message: str, module: str, internal: bool = False, critical: bool = False):
+    def error(
+        self, message: str, module: str, internal: bool = False, critical: bool = False
+    ):
         return self.log(message, module, internal, critical, "error")

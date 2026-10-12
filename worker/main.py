@@ -31,7 +31,6 @@ def graceful_shutdown(signum, frame):
         f"Recieved singal {signum}, shutting down...",
         "Main.Signal Handler",
         True,
-        False,
     )
     if client:
         client.close()
