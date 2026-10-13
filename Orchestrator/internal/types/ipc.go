@@ -27,7 +27,7 @@ type TaskResult struct {
 // IsDone, this function validate, matches the taskId, then tells the task is fail or done
 // but it will return false when there is any kind of error in validation, matches the taskId
 func (res *TaskResult) IsDone(taskId string) (bool, error) {
-	if res.Status == TaskDone || res.Status == TaskFail {
+	if !(res.Status == TaskDone || res.Status == TaskFail) {
 		return false, fmt.Errorf("malformed task return")
 	}
 	if res.TaskId == nil {

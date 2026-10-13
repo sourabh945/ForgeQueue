@@ -19,6 +19,7 @@ func NewWorker(id string, socketDir string, pythonBinPath string, scriptPath str
 	worker := &types.Worker{
 		ID:         id,
 		SocketPath: socketPath,
+		Status:     types.WorkerStarting,
 	}
 
 	if err := StartWorker(worker, pythonBinPath, scriptPath, WorkerStartTimeout); err != nil {
@@ -72,7 +73,9 @@ func StartWorker(w *types.Worker, pythonBinPath string, scriptPath string, start
 		ls.Close()
 
 		w.Conn = conn
-
+		w.SetStatus(types.WorkerFree)
+		w.StartedAt = time.Now()
+		done <- nil
 	}()
 
 	select {

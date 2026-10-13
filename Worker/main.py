@@ -94,7 +94,7 @@ while True:
         if handler is None:
             result = gr(
                 taskId,
-                "failed",
+                "fail",
                 {"outputFile": None, "error": "Unsupported task type"},
                 None,
             )
@@ -119,7 +119,7 @@ while True:
             except Exception as e:
                 result = gr(
                     taskId,
-                    "failed",
+                    "fail",
                     {"outputFile": None, "error": str(e)},
                     None,
                 )
@@ -127,7 +127,7 @@ while True:
     except Exception as e:
         result = gr(
             None,
-            "failed",
+            "fail",
             {"outputFile": None, "error": "Internal Error"},
             f"malformed task: {e}",
         )
