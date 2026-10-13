@@ -3,6 +3,7 @@ package ipc
 import (
 	"fmt"
 	"net"
+	utils "orch/internal/utils"
 	"os"
 	"time"
 )
@@ -15,17 +16,23 @@ const (
 // CreateListner create a stable socket file for connection
 func CreateListener(socketPath string) (*net.UnixListener, error) {
 
+	// define error handler
+	errh := utils.ErrorHandler{
+		Pkg: "ipc",
+		Fxn: "CreateListner",
+	}
+
 	// if the socket file is already present from previous converstation or crashed it will clear it
 	os.Remove(socketPath)
 
 	listner, err := net.ListenUnix("unix", &net.UnixAddr{Name: socketPath, Net: "unix"})
 	if err != nil {
-		return nil, fmt.Errorf("ipc.CreateListener: %w", err)
+		return nil, errh.Perror(err)
 	}
 
 	if err := os.Chmod(socketPath, 0600); err != nil {
 		listner.Close()
-		return nil, fmt.Errorf("ipc.CreateListener: chmod: %w", err)
+		return nil, errh.Errorf("chmod: %w", err)
 	}
 
 	listner.SetUnlinkOnClose(true) // auto-remove socket file on close

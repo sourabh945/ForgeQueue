@@ -1,8 +1,8 @@
 package worker
 
 import (
-	"fmt"
 	"io"
+	utils "orch/internal/utils"
 	"os/exec"
 	"syscall"
 )
@@ -10,6 +10,12 @@ import (
 // SpawnWorkerProcess is for spawn a new process for the worker
 // It configures a unique Process Group ID (PGID) to allow clean cascading terminations
 func SpawnWorkerProcess(pythonBinPath string, workerFilePath string, socketPath string) (*exec.Cmd, io.ReadCloser, io.ReadCloser, error) {
+
+	// define error handler
+	errh := utils.ErrorHandler{
+		Pkg: "worker",
+		Fxn: "SpawnWorkerProcess",
+	}
 
 	// arguments for the worker process to start
 	cmd := exec.Command(pythonBinPath, workerFilePath, socketPath)
@@ -23,15 +29,15 @@ func SpawnWorkerProcess(pythonBinPath string, workerFilePath string, socketPath 
 	// getting stdout and stderr pipe
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("worker.SpawnWorkerProcess: stdoutPipe: %w", err)
+		return nil, nil, nil, errh.Errorf("stdoutPipe: %w", err)
 	}
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("worker.SpawnWorkerProcess: stderrPipe: %w", err)
+		return nil, nil, nil, errh.Errorf("stderrPipe: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		return nil, nil, nil, fmt.Errorf("worker.SpawnWorker: %w", err)
+		return nil, nil, nil, errh.Perror(err)
 	}
 
 	return cmd, stdoutPipe, stderrPipe, nil

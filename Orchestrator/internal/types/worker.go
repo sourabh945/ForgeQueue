@@ -24,7 +24,7 @@ type Worker struct {
 	Status       WorkerStatus  // Status: running, free, failed, completed
 	SocketPath   string        // Path of the unix domain socket
 	Cmd          *exec.Cmd     // process executor pointer
-	Conn         net.UnixConn  // ipc Unix Domain socket connection
+	Conn         net.Conn      // ipc Unix Domain socket connection
 	StdOutPipe   io.ReadCloser // stdout pipe of worker process for logging
 	StdErrPipe   io.ReadCloser // stderr pipe of worker process for logging
 	Job          *Task         // Running task of the worker
