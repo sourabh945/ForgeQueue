@@ -5,15 +5,15 @@ from datetime import datetime as dt
 
 class Logger:
     def __init__(self):
-        pass
+        self.taskId = None
 
     def set_taskId(self, taskId: str):
         self.taskId = taskId
 
     def log(self, message: str, module: str, internal: bool, critical: bool, type: str):
         payload = {
-            "tempstamp": str(dt.now()),
-            "taskId": self.taskId or None,
+            "timestamp": str(dt.now()),
+            "taskId": self.taskId,
             "internal": internal,
             "critical": critical,
             "module": module,

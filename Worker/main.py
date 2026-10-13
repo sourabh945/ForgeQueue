@@ -15,7 +15,9 @@ from ipc import read_frame, write_frame, write_helo
 from response_generator import generate_response as gr
 
 SOCKET_PATH = ""
-client = None
+
+# unix domain sockets client for connection
+sock = None
 
 try:
     SOCKET_PATH = sys.argv[1]
@@ -32,8 +34,8 @@ def graceful_shutdown(signum, frame):
         "Main.Signal Handler",
         True,
     )
-    if client:
-        client.close()
+    if sock:
+        sock.close()
     sys.exit(0)
 
 
@@ -53,8 +55,7 @@ def connect_with_retry(path, attempts=10, delay=0.1):
     raise RuntimeError(f"Could not connect to {path} after {attempts} attempts")
 
 
-# unix domain sockets client for connection
-sock = None
+
 try:
     sock = connect_with_retry(SOCKET_PATH)
     logger.info(f"Connected to orchestrator at {SOCKET_PATH}", "Main", True)
