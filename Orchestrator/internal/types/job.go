@@ -87,7 +87,7 @@ func JobFromHash(h map[string]string, defaultMaxAttempts int) (*Job, error) {
 		WebhookURL:  h["webhookUrl"],
 		CreatedAt:   h["createdAt"],
 		StartedAt:   h["startedAt"],
-		FinishedAt:  h["finisedAt"],
+		FinishedAt:  h["finishedAt"],
 	}
 
 	if raw := h["result"]; raw != "" {

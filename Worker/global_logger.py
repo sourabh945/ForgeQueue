@@ -7,7 +7,10 @@ class Logger:
     def __init__(self):
         self.taskId = None
 
-    def set_taskId(self, taskId: str):
+    def set_taskId(self, taskId: str = ""):
+        if taskId == "":
+           self.taskId = None
+           return
         self.taskId = taskId
 
     def log(self, message: str, module: str, internal: bool, critical: bool, type: str):

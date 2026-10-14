@@ -19,7 +19,7 @@ func CreateListener(socketPath string) (*net.UnixListener, error) {
 	// define error handler
 	errh := utils.ErrorHandler{
 		Pkg: "ipc",
-		Fxn: "CreateListner",
+		Fxn: "CreateListener",
 	}
 
 	// if the socket file is already present from previous converstation or crashed it will clear it

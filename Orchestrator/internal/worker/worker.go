@@ -29,12 +29,9 @@ func NewWorker(id string, socketDir string, pythonBinPath string, scriptPath str
 	return worker, nil
 }
 
-// StartWorker is actually start the worker process and IPC for the worker and make those change to the worker
+// StartWorker is actually start the worker process
+// and IPC for the worker and make those change to the worker
 func StartWorker(w *types.Worker, pythonBinPath string, scriptPath string, startTimeout time.Duration) error {
-
-	// taking FLCK on the worker
-	w.Mutex.Lock()
-	defer w.Mutex.Unlock()
 
 	done := make(chan error, 1) // return channel
 
@@ -46,14 +43,22 @@ func StartWorker(w *types.Worker, pythonBinPath string, scriptPath string, start
 	// main function
 	go func() {
 
+		// taking FLCK on the worker
+		w.Mutex.Lock()
+		defer w.Mutex.Unlock()
+
+		w.StartedAt = time.Now()
+
 		ls, err := ipc.CreateListener(w.SocketPath)
 		if err != nil {
 			done <- errh.Perror(err)
+			return
 		}
 
 		cmd, stdoutPipe, stderrPipe, err := SpawnWorkerProcess(pythonBinPath, scriptPath, w.SocketPath)
 		if err != nil {
 			done <- errh.Perror(err)
+			return
 		}
 
 		w.Cmd = cmd
@@ -64,17 +69,19 @@ func StartWorker(w *types.Worker, pythonBinPath string, scriptPath string, start
 		if err != nil {
 			ls.Close()
 			done <- errh.Perror(err)
-		}
-
-		if err := ipc.WaitForHelo(conn, nil); err != nil {
-			done <- nil
+			return
 		}
 
 		ls.Close()
-
 		w.Conn = conn
+
+		if err := ipc.WaitForHelo(conn, nil); err != nil {
+			done <- nil
+			return
+		}
+
 		w.SetStatus(types.WorkerFree)
-		w.StartedAt = time.Now()
+
 		done <- nil
 	}()
 
@@ -82,13 +89,18 @@ func StartWorker(w *types.Worker, pythonBinPath string, scriptPath string, start
 	case err := <-done:
 		return err
 	case <-time.After(startTimeout):
-		if w.Conn != nil {
-			w.Conn.Close()
-		}
-		if w.Cmd != nil {
-			KillGroup(w.Cmd)
-		}
-		w.Status = types.WorkerDead
+		func() { // clean up function when timeout is happens
+			w.Mutex.Lock()
+			defer w.Mutex.Unlock()
+
+			if w.Conn != nil {
+				w.Conn.Close()
+			}
+			if w.Cmd != nil {
+				KillGroup(w.Cmd)
+			}
+			w.Status = types.WorkerDead
+		}()
 		return errh.Serror("Timer: timeout")
 	}
 

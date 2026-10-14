@@ -2,9 +2,9 @@ package ipc
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"net"
+	"orch/internal/utils"
 	"time"
 )
 
@@ -21,15 +21,21 @@ const MaxPayloadSize = MaxPayloadSizeInMiB * 1024 * 1024 // 16 MiB
 // return err only
 func WriteFrame(conn net.Conn, data []byte) error {
 
+	// creating error handler
+	errh := utils.ErrorHandler{
+		Pkg: "ipc",
+		Fxn: "WriteFrame",
+	}
+
 	// adding timeout for write data into the socket
 	defer conn.SetWriteDeadline(time.Time{})
 	if err := conn.SetWriteDeadline(time.Now().Add(FrameTimeout)); err != nil {
-		return fmt.Errorf("ipc.WriteFrame: timeout: %w", err)
+		return errh.Errorf("timeout: %w", err)
 	}
 
 	// checks the size of the frame is not greater than the MaxPayload
 	if len(data) > MaxPayloadSize {
-		return fmt.Errorf("ipc.WriteFrame: payload %.2f MiB exceeds max %d MiB", float64(len(data))/(1024*1024), MaxPayloadSizeInMiB)
+		return errh.Errorf("payload %.2f MiB exceeds max %d MiB", float64(len(data))/(1024*1024), MaxPayloadSizeInMiB)
 	}
 
 	// make the lengthHeader for payload
@@ -38,12 +44,12 @@ func WriteFrame(conn net.Conn, data []byte) error {
 
 	// Write header
 	if _, err := conn.Write(lengthHeader); err != nil {
-		return fmt.Errorf("ipc.WriteFrame: write header: %w", err)
+		return errh.Errorf("write header: %w", err)
 	}
 
 	// Write payload
 	if _, err := conn.Write(data); err != nil {
-		return fmt.Errorf("ipc.WriteFrame: write payload: %w", err)
+		return errh.Errorf("write payload: %w", err)
 	}
 
 	return nil
@@ -53,29 +59,35 @@ func WriteFrame(conn net.Conn, data []byte) error {
 // Return payload and error if the payload
 func ReadFrame(conn net.Conn) ([]byte, error) {
 
+	// creating error handler
+	errh := utils.ErrorHandler{
+		Pkg: "ipc",
+		Fxn: "ReadFrame",
+	}
+
 	// adding timeout for write data into the socket
 	defer conn.SetReadDeadline(time.Time{})
 	if err := conn.SetReadDeadline(time.Now().Add(FrameTimeout)); err != nil {
-		return nil, fmt.Errorf("ipc.WriteFrame: timeout: %w", err)
+		return nil, errh.Errorf("timeout: %w", err)
 	}
 
 	lengthHeader := make([]byte, 4)
 
 	if _, err := io.ReadFull(conn, lengthHeader); err != nil {
-		return nil, fmt.Errorf("ipc.ReadFrame: read header: %w", err)
+		return nil, errh.Errorf("read header: %w", err)
 	}
 
 	msgLength := binary.BigEndian.Uint32(lengthHeader)
 
 	// Make sure the msgLength is not greater than allowed Maximum msgLength
 	if msgLength > MaxPayloadSize {
-		return nil, fmt.Errorf("ipc.ReadFrame: payload %.2f MiB exceeds max %d MiB", float64(msgLength/(1024*1024)), MaxPayloadSizeInMiB)
+		return nil, errh.Errorf("payload %.2f MiB exceeds max %d MiB", float64(msgLength)/(1024*1024), MaxPayloadSizeInMiB)
 	}
 
 	payload := make([]byte, msgLength)
 
 	if _, err := io.ReadFull(conn, payload); err != nil {
-		return nil, fmt.Errorf("ipc.ReadFrame: read payload: %w", err)
+		return nil, errh.Errorf("read payload: %w", err)
 	}
 
 	return payload, nil

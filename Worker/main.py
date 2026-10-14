@@ -70,6 +70,7 @@ logger.info("Send HELO to the orch", "Main.write_helo", True)
 # main loop - read task, processing , response, repeat
 while True:
     taskId = None
+    logger.set_taskId()
     try:
         raw = read_frame(sock)
     except Exception as e:
