@@ -77,7 +77,7 @@ while True:
         logger.error(f"read_frame failed: {e}", "Main.MainWorkerLoop", True, True)
         break
 
-    if raw == b"":
+    if raw is None:
         logger.error("orchestrator close connection", "Main.MainWorkerLoop", True, True)
         break
 
@@ -93,45 +93,24 @@ while True:
         logger.info("Revcived the task", "Main.MainWorkerLoop", True)
 
         if handler is None:
-            result = gr(
-                taskId,
-                "fail",
-                {"outputFile": None, "error": "Unsupported task type"},
-                None,
-            )
+            result = gr(taskId, "fail", None, "Unsupported task type")
             logger.error("Unsupported task type", "Main.MainWorkerLoop")
         else:
             try:
                 output, status = handler(task.get("payload", {}))
-                result = gr(
-                    taskId,
-                    status,
-                    output,
-                    None,
-                )
+                if status == "done":
+                    result = gr(taskId, "done", output, None)
+                else:
+                    # failure: no result, the message goes in the error field
+                    result = gr(taskId, "fail", None, output.get("error"))
             except FileNotFoundError:
-                result = gr(
-                    taskId,
-                    "fail",
-                    {"outputFile": None, "error": "Internal Error"},
-                    "file is not found",
-                )
+                result = gr(taskId, "fail", None, "file is not found")
                 logger.error("FileNotFoundError", "Main.MainWorkerLoop", True, True)
             except Exception as e:
-                result = gr(
-                    taskId,
-                    "fail",
-                    {"outputFile": None, "error": str(e)},
-                    None,
-                )
+                result = gr(taskId, "fail", None, str(e))
                 logger.error(str(e), "Main.MainWorkerLoop")
     except Exception as e:
-        result = gr(
-            None,
-            "fail",
-            {"outputFile": None, "error": "Internal Error"},
-            f"malformed task: {e}",
-        )
+        result = gr(None, "fail", None, f"malformed task: {e}")
         logger.error("Malformed task", "Main.MainWorkerLoop", True, True)
     try:
         write_frame(sock, json.dumps(result).encode("utf-8"))

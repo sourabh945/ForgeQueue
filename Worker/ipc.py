@@ -4,12 +4,13 @@ MAX_PAYLOAD_SIZE = MAX_PAYLOAD_SIZE_IN_MB * 1024 * 1024
 
 
 def read_frame(sock):
-    """Read a frame from the socket."""
+    """Read a frame from the socket.
+    Returns None when the peer closed the connection, b"" for an empty frame."""
     length_bytes = _recv_exact(
         sock, 4
     )  # using 4 big-endint bytes for telling the size of the message
-    if length_bytes == b"":
-        return b""
+    if length_bytes is None:
+        return None
     msg_length = int.from_bytes(length_bytes, "big")
     if msg_length > MAX_PAYLOAD_SIZE:
         raise Exception("Max Size Limit Exceeded")
@@ -26,16 +27,17 @@ def write_frame(sock, data: bytes):
 
 
 def write_helo(sock):
-    "for telling the orchestrator, worker is ready"
+    "For telling the orchestrator, worker is ready"
     message = b"HELO"
     write_frame(sock, message)
 
 
 def _recv_exact(sock, n: int):
-    buf = b""
+    """Read exactly n bytes. Returns None if the peer closed the connection before n bytes arrived."""
+    buf = bytearray()
     while len(buf) < n:
         chunk = sock.recv(n - len(buf))
         if chunk == b"":
-            return b""  # peer closed connection in mid-read
+            return None  # peer closed connection in mid-read
         buf += chunk
     return buf

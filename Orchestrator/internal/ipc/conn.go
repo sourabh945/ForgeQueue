@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	DefaultAcceptWorkerTimeout = 5 * time.Second
+	DefaultAcceptWorkerTimeout = 2 * time.Second
 	DefaultHeloTimeout         = 500 * time.Millisecond
 )
 
@@ -71,15 +71,7 @@ func WaitForHelo(conn net.Conn, timeout *time.Duration) error {
 		Timeout = *timeout
 	}
 
-	// Helo hands timeout
-	if err := conn.SetReadDeadline(time.Now().Add(Timeout)); err != nil {
-		conn.Close()
-		return fmt.Errorf("ipc.WaitForHelo: timeout: %w", err)
-	}
-
-	raw, err := ReadFrame(conn)
-
-	conn.SetReadDeadline(time.Time{})
+	raw, err := ReadFrame(conn, Timeout)
 
 	if err != nil {
 		return fmt.Errorf("ipc.WaitForHelo: %w", err)

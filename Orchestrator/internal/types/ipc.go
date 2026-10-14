@@ -48,5 +48,8 @@ func (res *TaskResult) IsDone(taskId string) (bool, error) {
 // GetError it will return any internal error is happens
 // It is used because sometime there is internal error but not the actual err
 func (res *TaskResult) AnyError() error {
+	if res.Error == nil {
+		return nil
+	}
 	return fmt.Errorf("%v", *res.Error)
 }

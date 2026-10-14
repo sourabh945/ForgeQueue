@@ -5,6 +5,7 @@ import (
 	"net"
 	"os/exec"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -19,18 +20,19 @@ const (
 )
 
 type Worker struct {
-	Mutex        sync.RWMutex  // Mutex for thread safety
-	ID           string        // Unqiue identifier for the worker process
-	Status       WorkerStatus  // Status: running, free, failed, completed
-	SocketPath   string        // Path of the unix domain socket
-	Cmd          *exec.Cmd     // process executor pointer
-	Conn         net.Conn      // ipc Unix Domain socket connection
-	StdOutPipe   io.ReadCloser // stdout pipe of worker process for logging
-	StdErrPipe   io.ReadCloser // stderr pipe of worker process for logging
-	Job          *Task         // Running task of the worker
-	JobResponse  *TaskResult   // Result of the running task of the worker
-	RestartCount int           // restart count of the worker
-	StartedAt    time.Time     // when the current process was started
+	Mutex        sync.RWMutex    // Mutex for thread safety
+	ID           string          // Unqiue identifier for the worker process
+	Status       WorkerStatus    // Status: running, free, failed, completed
+	SocketPath   string          // Path of the unix domain socket
+	Cmd          *exec.Cmd       // process executor pointer
+	Conn         net.Conn        // ipc Unix Domain socket connection
+	StdOutPipe   io.ReadCloser   // stdout pipe of worker process for logging
+	StdErrPipe   io.ReadCloser   // stderr pipe of worker process for logging
+	Exited       <-chan struct{} // closed when the worker process has exited (crash, kill, normal exit)
+	Job          *Task           // Running task of the worker
+	JobResponse  *TaskResult     // Result of the running task of the worker
+	RestartCount int             // restart count of the worker
+	StartedAt    time.Time       // when the current process was started
 }
 
 // SetStatus change the status under the write lock
@@ -65,6 +67,55 @@ func (w *Worker) EndTask(result *TaskResult, next WorkerStatus) {
 	w.Job = nil
 	w.JobResponse = result
 	w.Status = next
+}
+
+// TermGroup kill all the group process of the worker using SIGTERM
+// Its for make sure all group of the process ( worker + worker child process ) are killed
+func (w *Worker) TermGroup() {
+	syscall.Kill(-w.Cmd.Process.Pid, syscall.SIGTERM)
+}
+
+// KillGroup kill all the group process of the worker using SIGKILL
+// Its for make sure all group of the process ( worker + worker child process ) are killed
+// It uses the SIGKILL so if the worker not allowed to terminate it will do using the OS inforcer
+func (w *Worker) KillGroup() {
+	syscall.Kill(-w.Cmd.Process.Pid, syscall.SIGKILL)
+}
+
+// Release clear the worker all pointers and remove there reference
+// And the left work is done by GC
+func (w *Worker) Release() {
+	w.Mutex.Lock()
+	defer w.Mutex.Unlock()
+
+	// Close the socket connection
+	if w.Conn != nil {
+		w.Conn.Close()
+		w.Conn = nil
+	}
+
+	// Kill the process if still running
+	if w.Cmd != nil && w.Cmd.Process != nil {
+		w.KillGroup()
+		w.Cmd.Wait()
+		w.Cmd = nil
+	}
+
+	// Close pipes
+	if w.StdOutPipe != nil {
+		w.StdOutPipe.Close()
+		w.StdOutPipe = nil
+	}
+	if w.StdErrPipe != nil {
+		w.StdErrPipe.Close()
+		w.StdErrPipe = nil
+	}
+
+	// Clear job references (lets GC collect the task data)
+	w.Job = nil
+	w.JobResponse = nil
+
+	w.Status = WorkerDead
 }
 
 // WorkerSnapshot is a copy of a worker's state that is safe to hand to the

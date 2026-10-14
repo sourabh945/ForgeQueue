@@ -2,7 +2,7 @@ package worker
 
 import (
 	"io"
-	utils "orch/internal/utils"
+	"orch/internal/utils"
 	"os/exec"
 	"syscall"
 )
@@ -41,17 +41,4 @@ func SpawnWorkerProcess(pythonBinPath string, workerFilePath string, socketPath 
 	}
 
 	return cmd, stdoutPipe, stderrPipe, nil
-}
-
-// TermGroup kill all the group process of the worker using SIGTERM
-// Its for make sure all group of the process ( worker + worker child process ) are killed
-func TermGroup(cmd *exec.Cmd) {
-	syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
-}
-
-// KillGroup kill all the group process of the worker using SIGKILL
-// Its for make sure all group of the process ( worker + worker child process ) are killed
-// It uses the SIGKILL so if the worker not allowed to terminate it will do using the OS inforcer
-func KillGroup(cmd *exec.Cmd) {
-	syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 }
