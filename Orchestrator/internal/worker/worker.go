@@ -1,6 +1,8 @@
 package worker
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"orch/internal/ipc"
@@ -121,4 +123,62 @@ func StartWorker(w *types.Worker, pythonBinPath string, scriptPath string, start
 	w.Mutex.Unlock()
 
 	return nil
+}
+
+// RunTask is for run and a wait for the response
+func RunTask(ctx context.Context, w *types.Worker, task *types.Task, timeout time.Duration) (*types.TaskResult, error) {
+
+	errh := utils.ErrorHandler{
+		Pkg: "worker",
+		Fxn: "RunTask",
+	}
+
+	// make it bind to parent
+	select {
+	case <-ctx.Done():
+		return nil, errh.Serror("Cancellation from parent")
+	default:
+	}
+
+	taskJson, err := json.Marshal(task)
+	if err != nil {
+		return nil, errh.Errorf("encoding task: %w", err)
+	}
+
+	w.SetStatus(types.WorkerBusy)
+
+	if err := ipc.WriteFrame(w.Conn, taskJson); err != nil {
+		w.SetStatus(types.WorkerDead)
+		return nil, errh.Perror(err)
+	}
+
+	response, err := ipc.ReadFrame(w.Conn, timeout)
+	if err != nil {
+		w.SetStatus(types.WorkerDead)
+		return nil, errh.Perror(err)
+	}
+
+	w.SetStatus(types.WorkerFree)
+
+	result := types.TaskResult{}
+
+	if err := json.Unmarshal(response, &result); err != nil {
+		return nil, errh.Errorf("decoding taskResult: %w", err)
+	}
+
+	isOk, err := result.IsDone(w.Job.TaskId)
+	if err != nil {
+		return nil, errh.Errorf("types.ipc.IsDone: %w", err)
+	}
+
+	if !isOk {
+		return nil, errh.Serror("types.ipc.IsDone: response is not valid")
+	}
+
+	return &result, nil
+
+}
+
+func Stop(w *types.Worker, grace) error {
+
 }
